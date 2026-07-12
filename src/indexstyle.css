@@ -1,0 +1,384 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   2. DESIGN TOKENS
+   ============================================================ */
+:root {
+  --color-navy:      #001F46;
+  --color-navy-mid:  #003375;
+  --color-accent:    #4FC3F7;
+  --color-cream:     #E9E4DE;
+  --color-bg:        #F5F7FA;
+}
+
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont,
+               'Segoe UI', 'Roboto', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+
+  /* FIX 1: Neutral background — no more navy on auth pages */
+  background-color: var(--color-bg);
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* ============================================================
+   4. TEXT SELECTION
+   ============================================================ */
+::selection {
+  background-color: var(--color-accent);
+  color: #ffffff;
+}
+
+/* ============================================================
+   5. CUSTOM SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar         { width: 8px; height: 8px; }
+::-webkit-scrollbar-track   { background: #f1f1f1; border-radius: 10px; }
+::-webkit-scrollbar-thumb   { background: #888; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+html { scrollbar-width: thin; scrollbar-color: #888 #f1f1f1; }
+
+/* ============================================================
+   6. KEYFRAMES
+   ============================================================ */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmerLoad {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ============================================================
+   7. ANIMATION CLASSES
+   ============================================================ */
+.animate-fadeIn  { animation: fadeIn   0.2s ease-out forwards; }
+.animate-slideUp { animation: slideUp  0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.fade-in         { animation: fadeIn   0.3s ease-out forwards; }
+.slide-in-right  { animation: slideInRight 0.3s ease-out forwards; }
+.slide-in-left   { animation: slideInLeft  0.3s ease-out forwards; }
+
+/* ============================================================
+   8. NAVBAR
+   ============================================================ */
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+/* Search box parent glow on focus-within.
+   Tailwind has no focus-within:box-shadow on a parent element. */
+.search-input-wrapper {
+  position: relative;
+  transition: box-shadow 0.2s ease;
+}
+
+.search-input-wrapper input {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid transparent;
+  outline: none;
+
+  /* FIX 3: Was "transition: background 0.2s ease" — VS Code linter flags
+     the "background" shorthand as ambiguous for transitions.
+     Changed to background-color which is precise and linter-clean. */
+  transition: background-color 0.2s ease;
+}
+
+.search-input-wrapper:focus-within {
+  box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.35);
+  border-radius: 0.5rem;
+}
+
+.search-input-wrapper input:focus {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Sidebar toggle micro-interaction */
+.sidebar-toggle-btn {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+.sidebar-toggle-btn:hover  { transform: scale(1.05); }
+.sidebar-toggle-btn:active { transform: scale(0.95); }
+
+/* ============================================================
+   9. SIDEBAR OVERLAY
+   ============================================================ */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 30;
+}
+@media (max-width: 1024px) {
+  .sidebar-overlay.active { display: block; }
+}
+
+/
+.react-select__menu {
+  z-index: 100 !important;
+}
+
+.react-select__control {
+  border: 1px solid #d1d5db !important;
+  border-radius: 0.375rem !important;
+  min-height: 42px !important;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+  cursor: pointer !important;
+}
+
+.react-select__control:hover {
+  border-color: #93c5fd !important;
+}
+
+.react-select__control--is-focused {
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25) !important;
+}
+
+.react-select__placeholder {
+  color: #9ca3af !important;
+  font-size: 0.875rem;
+}
+
+.react-select__single-value {
+  color: #111827 !important;
+  font-size: 0.875rem;
+}
+
+.react-select__option {
+  font-size: 0.875rem;
+  cursor: pointer !important;
+}
+
+.react-select__option--is-focused {
+  background-color: #eff6ff !important;
+  color: #1d4ed8 !important;
+}
+
+.react-select__option--is-selected {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+/* ============================================================
+   11. FOCUS & ACCESSIBILITY*/
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ============================================================
+   12. DISABLED STATES
+   ============================================================ */
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ============================================================
+   13. CARD & BUTTON EFFECTS
+   ============================================================ */
+.card-hover {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow  0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-hover:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1),
+              0 10px 10px -5px rgba(0,0,0,0.04);
+}
+
+/* New Project button shimmer — needs ::before, not possible in Tailwind */
+.new-project-button {
+  position: relative;
+  overflow: hidden;
+  z-index :10;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.new-project-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  left: -100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.45s ease;
+  pointer-events: none;
+}
+.new-project-button:hover::before    { left: 100%; }
+.new-project-button:hover            { transform: translateY(-2px); }
+.new-project-button:active           { transform: translateY(0); }
+.new-project-button-icon             { transition: transform 0.25s ease; }
+.new-project-button:hover .new-project-button-icon { transform: rotate(90deg); }
+
+.btn-primary {
+  background: linear-gradient(135deg, #4f46e5, #3b82f6);
+  color: #fff;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.btn-primary:hover  { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(79,70,229,0.3); }
+.btn-primary:active { transform: translateY(0); }
+
+/* ============================================================
+   14. SKELETON LOADER
+   ============================================================ */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmerLoad 1.5s infinite;
+  border-radius: 0.25rem;
+}
+
+/* ============================================================
+   15. TEXT TRUNCATION (Tailwind v3 built-in, kept as fallback)
+   ============================================================ */
+.line-clamp-1,
+.line-clamp-2,
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+}
+.line-clamp-1 { -webkit-line-clamp: 1; }
+.line-clamp-2 { -webkit-line-clamp: 2; }
+.line-clamp-3 { -webkit-line-clamp: 3; }
+
+/* ============================================================
+   16. LAYOUT GRIDS
+   ============================================================ */
+.grid-auto-fit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+}
+
+/* ============================================================
+   17. TOAST NOTIFICATIONS
+   ============================================================ */
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: #ffffff;
+  padding: 1rem 1.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+  animation: slideInRight 0.3s ease-out forwards;
+  z-index: 9999;
+  max-width: calc(100vw - 4rem);
+}
+@media (max-width: 640px) {
+  .toast { left: 1rem; right: 1rem; bottom: 1rem; max-width: calc(100vw - 2rem); }
+}
+
+/* ============================================================
+   18. PRINT
+   ============================================================ */
+@media print {
+  nav, aside, button, .no-print { display: none !important; }
+  body { background: #ffffff; }
+}
+
+/* ============================================================
+   19. REDUCED MOTION
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================
+   20. HIGH CONTRAST
+   ============================================================ */
+@media (prefers-contrast: high) {
+  button, a { outline: 2px solid currentColor; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-slideUp {
+  animation: slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px white inset !important;
+  box-shadow: 0 0 0 1000px white inset !important;
+  -webkit-text-fill-color: #111827 !important;
+  background-color: white !important;
+}

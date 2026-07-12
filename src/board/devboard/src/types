@@ -1,0 +1,581 @@
+import { useState, useCallback } from 'react';
+import type { Module, Tab, ActivitySection } from './types/index';
+
+import ActivityBar from './components/ActivityBar/ActivityBar';
+import TopBar      from './components/TopBar/TopBar';
+import Sidebar     from './components/Sidebar/Sidebar';
+import TabBar      from './components/TabBar/TabBar';
+import CodeEditor  from './components/CodeEditor/CodeEditor';
+import Terminal    from './components/Terminal/Terminal';
+import AIPanel     from './components/AIPanel/AIPanel';
+import StatusBar   from './components/StatusBar/StatusBar';
+
+// ── Seed data ─────────────────────────────────────────────────────────────────
+
+const INITIAL_MODULES: Module[] = [
+  { id: 'm1', name: 'Mood Creator', status: 'live',     progress: 70  },
+  { id: 'm2', name: 'Editor',       status: 'idle',     progress: 45  },
+  { id: 'm3', name: 'Manager',      status: 'complete', progress: 100 },
+];
+
+const INITIAL_TABS: Tab[] = [
+  { id: 't1', filename: 'mood_engine.py',   language: 'python',     isActive: true  },
+  { id: 't2', filename: 'editor_core.js',   language: 'javascript', isActive: false },
+  { id: 't3', filename: 'manager_logic.py', language: 'python',     isActive: false },
+  { id: 't4', filename: 'analyties.css',    language: 'css',        isActive: false },
+];
+
+// ── App ───────────────────────────────────────────────────────────────────────
+
+export default function App() {
+  const [showTerminal,   setShowTerminal]   = useState(false);
+  const [activeSection,  setActiveSection]  = useState<ActivitySection>('modules');
+  const [modules,        setModules]        = useState<Module[]>(INITIAL_MODULES);
+  const [activeModuleId, setActiveModuleId] = useState('m1');
+  const [tabs,           setTabs]           = useState<Tab[]>(INITIAL_TABS);
+
+  const tasksRunning = modules.filter(m => m.status === 'live').length;
+  const aiActive     = activeSection === 'ai';
+
+  // ── Handlers ────────────────────────────────────────────────────────────
+
+  const handleTabClick = useCallback((id: string) => {
+    setTabs(prev => prev.map(t => ({ ...t, isActive: t.id === id })));
+  }, []);
+
+  const handleTabClose = useCallback((id: string) => {
+    setTabs(prev => {
+      const wasActive = prev.find(t => t.id === id)?.isActive ?? false;
+      const next = prev.filter(t => t.id !== id);
+      if (wasActive && next.length > 0) {
+        next[next.length - 1] = { ...next[next.length - 1], isActive: true };
+      }
+      return next;
+    });
+  }, []);
+
+  const handleAddModule = useCallback(() => {
+    const m: Module = {
+      id: `m${Date.now()}`,
+      name: `Module ${modules.length + 1}`,
+      status: 'planning',
+      progress: 0,
+    };
+    setModules(prev => [...prev, m]);
+    setActiveModuleId(m.id);
+  }, [modules.length]);
+
+  // ── Render ───────────────────────────────────────────────────────────────
+
+  return (
+    <>
+      {/*
+        CRITICAL: override index.css #root styles that break the layout.
+        index.css sets  text-align:center  and  flex-direction:column on #root
+        which causes every child to stack vertically.
+        We reset it here so our IDE grid works correctly.
+      */}
+      <style>{`
+        /* ── Reset broken defaults from index.css ── */
+        *, *::before, *::after { box-sizing: border-box; }
+
+        html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+
+        #root {
+          width: 100% !important;
+          max-width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          border: none !important;
+          text-align: left !important;
+          min-height: 100svh;
+          height: 100svh;
+          display: flex !important;
+          flex-direction: column !important;
+          background: #0e0f14;
+          color: #c8cad6;
+          font-family: 'Segoe UI', system-ui, sans-serif;
+          font-size: 13px;
+          overflow: hidden;
+        }
+
+        h1, h2, h3, p { margin: 0; }
+
+        /* ── App shell ── */
+        .app-shell {
+          display: flex;
+          flex-direction: column;
+          width: 100%;
+          height: 100svh;
+          overflow: hidden;
+          background: #0e0f14;
+        }
+
+        /* ── TopBar ── */
+        .topbar {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          height: 40px;
+          min-height: 40px;
+          padding: 0 12px;
+          background: #13141c;
+          border-bottom: 1px solid #1e2030;
+          flex-shrink: 0;
+          z-index: 20;
+        }
+        .topbar-left   { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .logo-mark {
+          width: 24px; height: 24px;
+          background: linear-gradient(135deg,#7c3aed,#4f8ef7);
+          border-radius: 5px;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 10px; font-weight: 700; color: #fff;
+        }
+        .app-title { font-size: 13px; font-weight: 600; color: #e2e4f0; }
+        .search-bar {
+          flex: 1;
+          display: flex; align-items: center; gap: 6px;
+          background: #1a1c27; border: 1px solid #252738; border-radius: 6px;
+          padding: 0 10px; height: 26px;
+          max-width: 340px; margin: 0 auto;
+        }
+        .search-icon  { color: #555870; font-size: 13px; }
+        .search-input {
+          background: none; border: none; outline: none;
+          color: #c8cad6; font-size: 12px; width: 100%;
+        }
+        .search-input::placeholder { color: #555870; }
+        .search-kbd {
+          font-size: 10px; color: #555870;
+          background: #252738; border-radius: 3px; padding: 1px 4px;
+        }
+        .topbar-right  { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+        .topbar-icon   { background: none; border: none; cursor: pointer; font-size: 15px; padding: 0; }
+
+        /* Creator Mode badge */
+        .creator-mode-badge {
+          display: flex; align-items: center; gap: 6px;
+          background: #1a1c27; border: 1px solid #252738; border-radius: 5px;
+          padding: 3px 10px; font-size: 11px; color: #9ca3b8; cursor: pointer;
+        }
+        .creator-mode-badge:hover { border-color: #7c3aed; color: #e2e4f0; }
+
+        .avatar {
+          width: 24px; height: 24px; border-radius: 50%;
+          background: #7c3aed;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 10px; font-weight: 600; color: #fff; cursor: pointer;
+        }
+        .topbar-chevron { color: #555870; font-size: 11px; }
+
+        /* ── Body row ── */
+        .app-body {
+          display: flex;
+          flex-direction: row;        /* ← HORIZONTAL, not column */
+          flex: 1;
+          overflow: hidden;
+          min-height: 0;
+        }
+
+        /* ── Activity bar ── */
+        .activity-bar {
+          display: flex;
+          flex-direction: column;     /* icons stacked vertically */
+          align-items: center;
+          width: 46px;
+          min-width: 46px;
+          background: #13141c;
+          border-right: 1px solid #1e2030;
+          padding: 6px 0;
+          gap: 2px;
+          flex-shrink: 0;
+          overflow: hidden;
+        }
+        .act-icon {
+          width: 34px; height: 34px;
+          background: none; border: none; border-radius: 7px;
+          cursor: pointer; color: #555870; font-size: 16px;
+          display: flex; align-items: center; justify-content: center;
+          position: relative; transition: background .12s, color .12s;
+          flex-shrink: 0;
+        }
+        .act-icon:hover  { background: #1e2030; color: #c8cad6; }
+        .act-icon.active { color: #7c3aed; background: rgba(124,58,237,.12); }
+        .act-icon.active::before {
+          content: '';
+          position: absolute; left: -1px;
+          top: 50%; transform: translateY(-50%);
+          width: 3px; height: 18px;
+          background: #7c3aed; border-radius: 0 2px 2px 0;
+        }
+        .act-indicator { display: none; }   /* handled by ::before */
+        .act-spacer    { flex: 1; }
+        .act-run { color: #3de0a0 !important; }
+        .act-run:hover { background: rgba(61,224,160,.1) !important; }
+        .act-terminal  { font-family: monospace; font-size: 11px; font-weight: 700; }
+        .terminal-icon { font-family: monospace; font-size: 11px; }
+
+        /* ── Sidebar ── */
+        .sidebar {
+          display: flex;
+          flex-direction: column;
+          width: 190px;
+          min-width: 190px;
+          background: #13141c;
+          border-right: 1px solid #1e2030;
+          flex-shrink: 0;
+          overflow: hidden;
+        }
+        .sidebar-header {
+          padding: 10px 12px 6px;
+          font-size: 10px; font-weight: 600;
+          letter-spacing: 1px; color: #555870; text-transform: uppercase;
+          flex-shrink: 0;
+        }
+        .sidebar-list {
+          flex: 1; overflow-y: auto; padding: 4px 6px;
+          display: flex; flex-direction: column; gap: 3px;
+        }
+        .sidebar-list::-webkit-scrollbar { width: 3px; }
+        .sidebar-list::-webkit-scrollbar-thumb { background: #252738; border-radius: 2px; }
+
+        .add-module-btn {
+          margin: 6px; padding: 6px 0;
+          background: rgba(124,58,237,.1);
+          border: 1px dashed rgba(124,58,237,.35);
+          border-radius: 6px; color: #7c3aed; font-size: 12px;
+          cursor: pointer; display: flex; align-items: center;
+          justify-content: center; gap: 4px; transition: background .15s;
+          flex-shrink: 0;
+        }
+        .add-module-btn:hover { background: rgba(124,58,237,.18); }
+
+        /* Module card */
+        .module-card {
+          padding: 8px 9px; border-radius: 6px; cursor: pointer;
+          border: 1px solid transparent; transition: background .12s, border-color .12s;
+        }
+        .module-card:hover  { background: #1a1c27; }
+        .module-card.active { background: #1a1c27; border-color: var(--status-color, #7a82a6); }
+        .module-name {
+          font-size: 12px; font-weight: 500; color: #d4d6e8;
+          margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .module-meta  { display: flex; align-items: center; gap: 5px; }
+        .module-pct   { font-size: 11px; color: #555870; }
+        .status-dot   { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+        .status-label { font-size: 11px; }
+        .progress-bar { height: 2px; background: #1e2030; border-radius: 1px; margin-top: 4px; }
+        .progress-fill { height: 100%; border-radius: 1px; }
+
+        /* ── Main column ── */
+        .main-column {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+          background: #0e0f14;
+        }
+
+        /* ── Tab bar ── */
+        .tabs-row {
+          display: flex;
+          flex-direction: row;         /* tabs side-by-side */
+          align-items: center;
+          height: 34px; min-height: 34px;
+          background: #13141c;
+          border-bottom: 1px solid #1e2030;
+          overflow-x: auto;
+          flex-shrink: 0;
+        }
+        .tabs-row::-webkit-scrollbar { height: 2px; }
+        .tabs-row::-webkit-scrollbar-thumb { background: #252738; }
+
+        .tab {
+          display: flex; align-items: center; gap: 5px;
+          padding: 0 11px; height: 34px;
+          cursor: pointer; border-right: 1px solid #1e2030;
+          font-size: 12px; color: #7a7f9a;
+          white-space: nowrap; flex-shrink: 0;
+          transition: background .12s, color .12s;
+          border-bottom: 2px solid transparent;
+        }
+        .tab:hover  { background: #1a1c27; color: #c8cad6; }
+        .tab.active { background: #0e0f14; color: #e2e4f0; border-bottom-color: #7c3aed; }
+        .tab-icon     { font-size: 13px; }
+        .tab-name     { font-size: 12px; }
+        .tab-modified { color: #f5c542; font-size: 10px; }
+        .tab-close {
+          background: none; border: none; cursor: pointer;
+          color: #555870; font-size: 10px; padding: 0;
+          width: 14px; height: 14px;
+          display: flex; align-items: center; justify-content: center;
+          border-radius: 3px; line-height: 1;
+        }
+        .tab-close:hover { background: #252738; color: #ff5b5b; }
+        .tab-more { padding: 0 10px; color: #555870; font-size: 13px; cursor: pointer; flex-shrink: 0; }
+
+        /* ── Code editor ── */
+        .editor-area {
+          flex: 1;
+          display: flex;
+          flex-direction: row;         /* line-numbers | code side-by-side */
+          overflow: auto;
+          background: #0e0f14;
+          font-family: 'Cascadia Code','Fira Code',ui-monospace,monospace;
+          font-size: 13px; line-height: 1.6;
+          min-height: 0;
+        }
+        .editor-area::-webkit-scrollbar { width: 8px; height: 8px; }
+        .editor-area::-webkit-scrollbar-track { background: #0e0f14; }
+        .editor-area::-webkit-scrollbar-thumb { background: #1e2030; border-radius: 4px; }
+
+        .line-numbers {
+          display: flex; flex-direction: column;
+          padding: 12px 12px 12px 10px;
+          background: #0e0f14;
+          border-right: 1px solid #181924;
+          text-align: right; color: #3a3d52;
+          user-select: none; flex-shrink: 0;
+        }
+        .ln { display: block; cursor: pointer; line-height: 1.6; font-size: 12px; transition: color .1s; }
+        .ln:hover, .ln.active { color: #7a7f9a; }
+
+        .code-content { flex: 1; padding: 12px 0 12px 14px; white-space: pre; }
+        .code-line {
+          display: block; line-height: 1.6; padding-right: 24px;
+          padding-left: 6px; border-left: 2px solid transparent; cursor: pointer;
+        }
+        .code-line:hover     { background: rgba(255,255,255,.02); }
+        .code-line.highlighted { background: rgba(79,142,247,.06); border-left-color: #4f8ef7; }
+        .code-line.error-line  { background: rgba(255,91,91,.06);  border-left-color: #ff5b5b; }
+        .code-line.cursor-line { background: rgba(255,255,255,.03); }
+
+        /* Syntax colours */
+        .kw  { color: #c084fc; }
+        .fn  { color: #4f8ef7; }
+        .var { color: #7dd3fc; }
+        .op  { color: #7a82a6; }
+        .str { color: #3de0a0; }
+        .cm  { color: #555870; font-style: italic; }
+        .num { color: #f5c542; }
+        .pm  { color: #f5a623; }
+
+        /* ── Terminal panel ── */
+        .terminal-panel {
+          border-top: 1px solid #1e2030;
+          background: #0a0b10;
+          display: flex; flex-direction: column;
+          height: 190px; flex-shrink: 0;
+        }
+        .terminal-header {
+          display: flex; align-items: center;
+          padding: 0 10px; height: 34px; min-height: 34px;
+          border-bottom: 1px solid #1e2030; gap: 6px; flex-shrink: 0;
+        }
+        .terminal-tabs { display: flex; gap: 2px; flex: 1; }
+        .terminal-tab {
+          padding: 0 10px; height: 34px;
+          display: flex; align-items: center;
+          font-size: 12px; color: #555870; cursor: pointer;
+          border-bottom: 2px solid transparent;
+        }
+        .terminal-tab.active { color: #e2e4f0; border-bottom-color: #7c3aed; }
+        .terminal-actions { display: flex; gap: 3px; }
+        .term-btn {
+          background: none; border: none; cursor: pointer;
+          color: #555870; font-size: 13px; padding: 2px 5px; border-radius: 4px;
+        }
+        .term-btn:hover { background: #1e2030; color: #c8cad6; }
+        .terminal-body {
+          flex: 1; overflow-y: auto; padding: 6px 10px;
+          font-family: 'Cascadia Code','Fira Code',ui-monospace,monospace;
+          font-size: 12px; cursor: text;
+        }
+        .terminal-body::-webkit-scrollbar { width: 4px; }
+        .terminal-body::-webkit-scrollbar-thumb { background: #1e2030; border-radius: 2px; }
+        .term-line       { line-height: 1.6; }
+        .term-info       { color: #555870; }
+        .term-output     { color: #c8cad6; }
+        .term-error      { color: #ff5b5b; }
+        .term-input      { color: #3de0a0; }
+        .term-input-row  { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+        .term-prompt     { color: #3de0a0; flex-shrink: 0; }
+        .term-input:not(.term-line) {
+          background: none; border: none; outline: none;
+          color: #c8cad6; font-family: inherit; font-size: inherit;
+          flex: 1; caret-color: #7c3aed; width: 100%;
+        }
+
+        /* ── AI Panel ── */
+        .ai-panel {
+          display: flex; flex-direction: column;
+          width: 230px; min-width: 230px;
+          background: #13141c;
+          border-left: 1px solid #1e2030;
+          flex-shrink: 0; overflow: hidden;
+        }
+        .ai-header {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 9px 10px 7px;
+          font-size: 10px; font-weight: 600; letter-spacing: 1px;
+          color: #555870; text-transform: uppercase; flex-shrink: 0;
+        }
+        .ai-dot {
+          width: 6px; height: 6px; border-radius: 50%;
+          background: #3de0a0; box-shadow: 0 0 5px #3de0a0;
+        }
+        .ai-input-wrap { display: flex; gap: 4px; padding: 0 7px 7px; flex-shrink: 0; }
+        .ai-input {
+          flex: 1; background: #1a1c27; border: 1px solid #252738;
+          border-radius: 5px; padding: 4px 7px;
+          color: #c8cad6; font-size: 12px; outline: none;
+        }
+        .ai-input::placeholder { color: #555870; }
+        .ai-input:focus { border-color: #7c3aed; }
+        .ai-send {
+          background: #7c3aed; border: none; border-radius: 5px;
+          color: #fff; font-size: 11px; cursor: pointer; padding: 0 9px;
+        }
+        .ai-send:hover { background: #6d28d9; }
+        .ai-suggestions  { padding: 0 7px 7px; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+        .ai-suggestion-btn {
+          background: #1a1c27; border: 1px solid #252738; border-radius: 5px;
+          color: #7a7f9a; font-size: 11px; cursor: pointer;
+          padding: 5px 8px; text-align: left; transition: background .12s, color .12s;
+        }
+        .ai-suggestion-btn:hover { background: #252738; color: #c8cad6; }
+        .ai-logs-tabs { display: flex; border-bottom: 1px solid #1e2030; flex-shrink: 0; }
+        .ai-tab {
+          flex: 1; padding: 5px 0; font-size: 11px; color: #555870;
+          background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer;
+        }
+        .ai-tab.active { color: #e2e4f0; border-bottom-color: #7c3aed; }
+        .ai-logs {
+          flex: 1; overflow-y: auto; padding: 6px 7px;
+          display: flex; flex-direction: column; gap: 2px;
+        }
+        .ai-logs::-webkit-scrollbar { width: 3px; }
+        .ai-logs::-webkit-scrollbar-thumb { background: #252738; border-radius: 2px; }
+        .log-line  { display: flex; align-items: flex-start; gap: 5px; }
+        .log-tag   { font-size: 10px; font-weight: 600; padding: 1px 4px; border-radius: 3px; flex-shrink: 0; margin-top: 1px; }
+        .log-text  { font-size: 11px; color: #9ca3b8; line-height: 1.5; }
+        .ai-action-row { display: flex; gap: 5px; padding: 7px; flex-shrink: 0; }
+        .ai-action-btn {
+          flex: 1; padding: 5px 0; font-size: 11px; border-radius: 5px;
+          border: 1px solid; cursor: pointer; font-family: monospace;
+        }
+        .ai-action-btn.run  { background: rgba(61,224,160,.1); border-color: rgba(61,224,160,.3); color: #3de0a0; }
+        .ai-action-btn.run:hover:not(:disabled) { background: rgba(61,224,160,.18); }
+        .ai-action-btn.run:disabled { opacity: .5; cursor: not-allowed; }
+        .ai-action-btn.test { background: rgba(79,142,247,.1); border-color: rgba(79,142,247,.3); color: #4f8ef7; }
+        .ai-action-btn.test:hover { background: rgba(79,142,247,.18); }
+        .ai-test-input-wrap { padding: 0 7px 7px; flex-shrink: 0; }
+        .ai-test-label { font-size: 10px; color: #555870; margin-bottom: 3px; }
+        .ai-test-input {
+          width: 100%;
+          background: #1a1c27; border: 1px solid #252738;
+          border-radius: 5px; padding: 4px 7px;
+          color: #c8cad6; font-size: 11px; outline: none;
+        }
+        .ai-test-input::placeholder { color: #555870; }
+
+        /* ── Status bar ── */
+        .statusbar {
+          display: flex; flex-direction: row; align-items: center;
+          height: 22px; min-height: 22px;
+          padding: 0 6px;
+          background: #7c3aed;
+          flex-shrink: 0; gap: 0;
+          font-size: 11px; color: rgba(255,255,255,.85);
+          overflow: hidden;
+        }
+        .status-item {
+          display: flex; align-items: center; gap: 4px;
+          padding: 0 7px; height: 100%; cursor: default;
+          white-space: nowrap; flex-shrink: 0;
+        }
+        .status-item:hover { background: rgba(0,0,0,.15); }
+        .status-run-btn, .status-term-btn { cursor: pointer; }
+        .status-dot-sm  { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+        .status-dot-sm.live { background: #3de0a0; box-shadow: 0 0 4px #3de0a0; }
+        .status-dot-sm.idle { background: rgba(255,255,255,.4); }
+        .status-sep     { flex: 1; }
+        .status-accuracy { display: flex; align-items: center; gap: 5px; padding: 0 7px; flex-shrink: 0; }
+        .accuracy-val   { font-weight: 600; color: #fff; }
+        .status-sync    { cursor: pointer; }
+        .status-icon    { font-size: 12px; }
+        .status-logo    { font-size: 14px; }
+      `}</style>
+
+      <div className="app-shell">
+
+        {/* ── Top Bar ─────────────────────────────────────────────────────── */}
+        <TopBar onSearch={() => {}} />
+
+        {/* ── Body: horizontal row ─────────────────────────────────────────── */}
+        <div className="app-body">
+
+          {/* 1. Activity bar (leftmost vertical strip) */}
+          <ActivityBar
+            active={activeSection}
+            onChange={setActiveSection}
+            onRun={() => {}}
+            onTerminal={() => setShowTerminal(v => !v)}
+          />
+
+          {/* 2. Sidebar — modules & tasks sections only */}
+          {(activeSection === 'modules' || activeSection === 'tasks') && (
+            <Sidebar
+              modules={modules}
+              activeModuleId={activeModuleId}
+              onModuleClick={setActiveModuleId}
+              onAddModule={handleAddModule}
+            />
+          )}
+
+          {/* 3. Main editor column */}
+          <div className="main-column">
+
+            {/* Tab bar */}
+            <TabBar
+              tabs={tabs}
+              onTabClick={handleTabClick}
+              onTabClose={handleTabClose}
+            />
+
+            {/* Code editor — always visible */}
+            <CodeEditor />
+
+            {/* Terminal — toggled */}
+            <Terminal
+              isVisible={showTerminal}
+              onClose={() => setShowTerminal(false)}
+            />
+
+          </div>
+
+          {/* 4. AI panel — only when AI section active */}
+          {activeSection === 'ai' && (
+            <AIPanel />
+          )}
+
+        </div>
+
+        {/* ── Status Bar ──────────────────────────────────────────────────── */}
+        <StatusBar
+          mode="Dev Mode"
+          aiActive={aiActive}
+          tasksRunning={tasksRunning}
+          accuracy={97}
+          onToggleTerminal={() => setShowTerminal(v => !v)}
+          onToggleRun={() => {}}
+        />
+
+      </div>
+    </>
+  );
+}
+c:\Users\wb\Downloads\index (2).css

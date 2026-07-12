@@ -1,0 +1,30 @@
+/* index.css — reset only, all app styles live in App.tsx <style> block */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0e0f14;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  height: 100svh;
+  margin: 0;
+  padding: 0;
+  border: none;
+  /* Do NOT set text-align: center here — it breaks the IDE layout */
+  /* Do NOT set flex-direction: column here — App.tsx controls its own layout */
+  display: block;
+  overflow: hidden;
+  background: #0e0f14;
+}

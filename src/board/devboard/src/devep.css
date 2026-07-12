@@ -1,0 +1,80 @@
+
+.devboard-root {
+  /* =========================
+     THEME VARIABLES
+  ========================== */
+  --text: #6b6375;
+  --text-h: #08060d;
+  --bg: #ffffff;
+  --border: #e5e4e7;
+  --code-bg: #f4f3ec;
+
+  --accent: #aa3bff;
+  --accent-bg: rgba(170, 59, 255, 0.1);
+  --accent-border: rgba(170, 59, 255, 0.5);
+
+  --shadow: rgba(0, 0, 0, 0.1) 0 10px 15px -3px;
+
+  --font: system-ui, Segoe UI, Roboto, sans-serif;
+
+  /* =========================
+     BASE LAYOUT
+  ========================== */
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+
+  width: 100%;
+  min-height: 100vh;
+
+  display: flex;
+  flex-direction: column;
+
+  box-sizing: border-box;
+}
+@media (prefers-color-scheme: dark) {
+  .devboard-root {
+    --text: #9ca3af;
+    --text-h: #f3f4f6;
+    --bg: #16171d;
+    --border: #2e303a;
+    --code-bg: #1f2028;
+
+    --accent: #c084fc;
+    --accent-bg: rgba(192, 132, 252, 0.15);
+    --accent-border: rgba(192, 132, 252, 0.5);
+
+    --shadow: rgba(0, 0, 0, 0.4) 0 10px 15px -3px;
+  }
+}
+
+
+.devboard-root h1,
+.devboard-root h2 {
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.devboard-root h1 {
+  font-size: 48px;
+  margin: 24px 0;
+}
+
+.devboard-root h2 {
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+
+.devboard-root p {
+  margin: 0;
+}
+.devboard-root code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 14px;
+
+  padding: 4px 8px;
+  border-radius: 6px;
+
+  background: var(--code-bg);
+  color: var(--text-h);
+}

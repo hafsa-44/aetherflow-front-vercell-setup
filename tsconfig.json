@@ -1,0 +1,21 @@
+   {
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "types": ["vite/client"],
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "module": "ESNext",  
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+
+    "jsx": "react-jsx",
+
+    "allowJs": true,    
+    "checkJs": false
+  },
+  "include": ["src", "src/api.ts", "src/planboard", "src/board/designboard", "src/board/devboard", "../server/src/utils/yjsserver.ts"]
+}
