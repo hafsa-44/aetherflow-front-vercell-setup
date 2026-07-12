@@ -1,4 +1,3 @@
-
 //// components/MembersPanel.tsx
 // Real-time members panel with "currently viewing" presence.
 // When any member opens this panel, all other connected members
@@ -7,7 +6,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
   X, Users, Link, Copy, Check, Clock,
-  Loader2, Crown, Shield, Code2, Pen, Eye,
+  Loader2, Crown, Shield, Code2, Pen, Eye, AlertTriangle,
 } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import { getAccessToken } from "../api";
@@ -116,6 +115,14 @@ export default function MembersPanel({ projectId, isOpen, onClose, canInvite, cu
   const [sendSuccess,    setSendSuccess]    = useState("");
   const [copied,         setCopied]         = useState("");
 
+  // When re-inviting an email that already has a pending invite with a
+  // DIFFERENT role, the backend will rotate the token — killing any link
+  // that was already copied/emailed. We confirm with the user first instead
+  // of doing that silently.
+  const [pendingRoleChangeConfirm, setPendingRoleChangeConfirm] = useState<{
+    email: string; oldRole: string; newRole: InvitableRole;
+  } | null>(null);
+
   const socketRef = useRef<Socket | null>(null);
 
   // ── Socket setup for panel presence ───────────────────────────────────────
@@ -209,10 +216,32 @@ export default function MembersPanel({ projectId, isOpen, onClose, canInvite, cu
       setSendError("");
       setSendSuccess("");
       setCopied("");
+      setPendingRoleChangeConfirm(null);
     }
   }, [isOpen, loadData]);
 
-  // ── Send invite ────────────────────────────────────────────────────────────
+  // ── Send invite (actual API call) ───────────────────────────────────────────
+  const doSendInvite = async (trimmedEmail: string, role: InvitableRole) => {
+    setSending(true);
+    try {
+      const res = await api.post("/invites", { projectId, email: trimmedEmail, role });
+      const emailSent = res.data?.emailSent !== false;
+      setSendSuccess(
+        emailSent
+          ? `Invite sent to ${trimmedEmail}`
+          : `Invite created for ${trimmedEmail}, but the email failed to send. You can still copy the link below.`
+      );
+      setInviteEmail("");
+      await loadData();
+    } catch (err: any) {
+      setSendError(err.response?.data?.message || "Failed to send invitation.");
+    } finally {
+      setSending(false);
+      setPendingRoleChangeConfirm(null);
+    }
+  };
+
+  // ── Send invite (entry point — checks for role-change conflicts first) ─────
   const handleSendInvite = async () => {
     setSendError(""); setSendSuccess("");
     const trimmed = inviteEmail.trim().toLowerCase();
@@ -220,17 +249,16 @@ export default function MembersPanel({ projectId, isOpen, onClose, canInvite, cu
       setSendError("Enter a valid email address.");
       return;
     }
-    setSending(true);
-    try {
-      await api.post("/invites", { projectId, email: trimmed, role: selectedRole });
-      setSendSuccess(`Invite sent to ${trimmed}`);
-      setInviteEmail("");
-      await loadData();
-    } catch (err: any) {
-      setSendError(err.response?.data?.message || "Failed to send invitation.");
-    } finally {
-      setSending(false);
+
+    // If there's already a pending invite for this email with a DIFFERENT
+    // role, warn the user first — sending will invalidate the old link.
+    const existing = pendingInvites.find(i => i.email.toLowerCase() === trimmed);
+    if (existing && existing.role !== selectedRole) {
+      setPendingRoleChangeConfirm({ email: trimmed, oldRole: existing.role, newRole: selectedRole });
+      return;
     }
+
+    await doSendInvite(trimmed, selectedRole);
   };
 
   // ── Copy invite link ───────────────────────────────────────────────────────
@@ -413,12 +441,42 @@ export default function MembersPanel({ projectId, isOpen, onClose, canInvite, cu
                   })}
                 </div>
 
+                {/* Role-change confirmation — sending would invalidate the
+                    recipient's existing link, so we ask first. */}
+                {pendingRoleChangeConfirm && (
+                  <div className="mb-3 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
+                    <div className="flex gap-2">
+                      <AlertTriangle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        <strong>{pendingRoleChangeConfirm.email}</strong> already has a pending invite as{" "}
+                        <strong>{ROLE_CONFIG[pendingRoleChangeConfirm.oldRole as keyof typeof ROLE_CONFIG]?.label ?? pendingRoleChangeConfirm.oldRole}</strong>.
+                        Sending as <strong>{ROLE_CONFIG[pendingRoleChangeConfirm.newRole].label}</strong> will
+                        invalidate their existing invite link.
+                      </p>
+                    </div>
+                    <div className="flex gap-2 mt-2 pl-6">
+                      <button
+                        onClick={() => doSendInvite(pendingRoleChangeConfirm.email, pendingRoleChangeConfirm.newRole)}
+                        disabled={sending}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors">
+                        {sending ? "Sending…" : "Send anyway"}
+                      </button>
+                      <button
+                        onClick={() => setPendingRoleChangeConfirm(null)}
+                        disabled={sending}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Email + send */}
                 <div className="flex gap-2 mb-2">
                   <input
                     type="email"
                     value={inviteEmail}
-                    onChange={e => { setInviteEmail(e.target.value); setSendError(""); setSendSuccess(""); }}
+                    onChange={e => { setInviteEmail(e.target.value); setSendError(""); setSendSuccess(""); setPendingRoleChangeConfirm(null); }}
                     onKeyDown={e => { if (e.key === "Enter") handleSendInvite(); }}
                     placeholder="colleague@example.com"
                     className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 transition-all"

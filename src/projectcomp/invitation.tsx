@@ -12,7 +12,7 @@ interface InviteDetails {
   project:   { _id: string; name: string; description: string; color: string; category: string }
   invitedBy: { name: string; email: string }
   email:     string
-  role:      "manager" | "developer" | "designer" | "viewer"
+  role:      "manager" | "developer" | "designer" | "member"
   expiresAt: string
   token:     string
 }
@@ -36,7 +36,7 @@ const ROLE_META: Record<string, { label: string; description: string; initial: s
     description: "Access to planning and design boards. No access to the development board.",
     initial:     "D",
   },
-  viewer: {
+  member: {
     label:       "Member",
     description: " Access across all project data  .Cannot edit or manage project settings.",
     initial:     "Mmr",

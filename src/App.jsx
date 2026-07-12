@@ -42,7 +42,7 @@ import { Toaster } from "react-hot-toast";
 import SignUP         from "./authen/signUp";
 import SignIN         from "./authen/signin";
 import UserLogPage    from "./userLogdash";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider } from "./context/authcontext";
 import PlanningScreen from "./projectcomp/plandash";
 import ProtectedRoute from "./authen/protectroute";
 import Layout         from "./Layout_";
