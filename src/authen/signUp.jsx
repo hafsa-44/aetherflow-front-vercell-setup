@@ -256,7 +256,7 @@ import { FcGoogle } from "react-icons/fc";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { handleSignup } from "./signuphandler";
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/authcontext";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 

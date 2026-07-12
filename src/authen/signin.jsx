@@ -5,7 +5,7 @@ import { handleSignin } from "./signuphandler";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom"; 
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/authcontext";
 import { useSearchParams } from "react-router-dom";
 function SignIN() {
   const [email, setEmail] = useState("");
