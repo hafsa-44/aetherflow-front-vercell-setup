@@ -108,7 +108,7 @@ import { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import NavBar  from "./projectcomp/Navbar_";
 import Sidebar from "./sidebar";
-import { useAuth } from "./context/AuthContext";
+import { useAuth } from "./context/authcontext";
 
 function Layout() {
   const { currentUser: user } = useAuth();
