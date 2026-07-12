@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams }   from "react-router-dom";
-import { useAuth }     from "../../../context/AuthContext";
+import { useAuth }     from "../../../context/authcontext";
 import api             from "../../../api";
 import { useBoardSync, type BoardPhase } from "./../../../hook/useBoardSync";
 
