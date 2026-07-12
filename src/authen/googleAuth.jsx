@@ -71,7 +71,7 @@ if (token) {
 export default LoginSuccess;*/}
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/authcontext";
 
 const LoginSuccess = () => {
   const navigate = useNavigate();
