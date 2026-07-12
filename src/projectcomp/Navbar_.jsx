@@ -5,8 +5,8 @@ import logo from "../assets/logo.svg";
 
 // ADDED: import the two new components
 // Search and Bell icons are no longer needed from lucide — each component handles its own
-import SearchBar          from "./SearchBar";
-import NotificationBell   from "./NotificationBell";
+import SearchBar          from "./searchbar";
+import NotificationBell   from "./notificationbell";
 
 // NavBar receives socket as a prop so NotificationBell can listen for live events.
 // In Layout_.jsx (or wherever NavBar is rendered), pass the socket instance:
