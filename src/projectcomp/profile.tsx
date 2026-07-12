@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api'; // Your axios instance
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/authcontext';
 
 const Profile = () => {
   const navigate = useNavigate();
