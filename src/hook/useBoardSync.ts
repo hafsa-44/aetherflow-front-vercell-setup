@@ -1,16 +1,11 @@
 
-//new file 
-// src/hook/useBoardSync.ts
-//
-// Single hook used by every board (planning, design, development).
-// Returns:
-//   phaseData   — current phase canvas data
-//   syncPatch   — call on any local canvas change
-//   socket      — stable ref (board.tsx uses it for phase:updated)
-//   loaded      — true once initial fetch completes
-//   cursors     — other users' cursor positions { [userId]: { name, color, x, y } }
-//   presence    — users currently in this board room
-//   error
+
+
+
+
+
+
+
 
 import { useEffect, useRef, useCallback, useState } from "react";
 import { io, type Socket }     from "socket.io-client";
@@ -55,7 +50,9 @@ interface UseBoardSyncReturn {
   emitCommentRead: (threadId: string, commentId: string) => void;
 }
 
-const SERVER_URL         = import.meta.env.VITE_SERVER_URL ?? "http://localhost:5000";
+//const SERVER_URL         = import.meta.env.VITE_SERVER_URL ?? "http://localhost:5000";
+//const SERVER_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
+const SERVER_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 const AUTOSAVE_DELAY     = 5_000;
 const CURSOR_THROTTLE_MS = 40;   // ~25fps — smooth without flooding
 
@@ -286,26 +283,72 @@ export function useBoardSync(
   }, [phase, projectId]);
 
   // ── 4. Autosave ────────────────────────────────────────────────────────────
-  const scheduleSave = useCallback(() => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      if (!projectId) return;
-      const token = getAccessToken();
-      if (!token) return;
-      try {
-        await api.put(`/boards/${projectId}`, {
-          phase,
-          data: allPhasesRef.current[phase],
-        });
-        setSaveError(null); // clears any previous failure once a save succeeds
-      } catch (err: any) {
-        const msg = err?.response?.data?.message ?? err?.message ?? "Save failed";
-        console.warn("[useBoardSync] autosave failed:", msg);
-        setSaveError(msg);
-        setTimeout(() => setSaveError(null), 6000); // auto-clear after 6s
-      }
-    }, AUTOSAVE_DELAY);
+  // performSave does the actual network write; scheduleSave debounces it so
+  // we don't hit the DB on every keystroke. dirtyRef tracks whether there's
+  // an unsaved change sitting in memory — that's what lets the flush below
+  // know whether it actually needs to do anything.
+  const dirtyRef = useRef(false);
+
+  const performSave = useCallback(async () => {
+    if (!projectId) return;
+    const token = getAccessToken();
+    if (!token) return;
+    try {
+      await api.put(`/boards/${projectId}`, {
+        phase,
+        data: allPhasesRef.current[phase],
+      });
+      dirtyRef.current = false;
+      setSaveError(null); // clears any previous failure once a save succeeds
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? "Save failed";
+      console.warn("[useBoardSync] autosave failed:", msg);
+      setSaveError(msg);
+      setTimeout(() => setSaveError(null), 6000); // auto-clear after 6s
+    }
   }, [projectId, phase]);
+
+  const scheduleSave = useCallback(() => {
+    dirtyRef.current = true;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => { performSave(); }, AUTOSAVE_DELAY);
+  }, [performSave]);
+
+  // Flush immediately, bypassing the debounce — used when the tab is about to
+  // go away. Without this, any change made in the AUTOSAVE_DELAY window
+  // before a refresh/close/navigation is silently lost: the pending
+  // setTimeout never gets to fire, so a delete or rename can look applied
+  // right up until reload, then quietly revert to whatever was last actually
+  // written to MongoDB.
+  //
+  // NOTE: this is best-effort, not a hard guarantee — it uses the same axios
+  // instance as everything else, which under the hood is XHR, not fetch, so
+  // there's no `keepalive` flag to lean on here. Firing on `visibilitychange`
+  // (tab hidden) and `pagehide` rather than only `beforeunload` gives the
+  // request the best realistic head start — those fire earlier and more
+  // reliably than `beforeunload`, including on mobile — but an abrupt tab
+  // kill can still race it. If `api` is ever switched to a fetch-based
+  // client, adding `{ keepalive: true }` to this specific call would close
+  // that last gap.
+  const flushSave = useCallback(() => {
+    if (!dirtyRef.current) return;
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+    performSave();
+  }, [performSave]);
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flushSave();
+    };
+    window.addEventListener("pagehide", flushSave);
+    window.addEventListener("beforeunload", flushSave);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flushSave);
+      window.removeEventListener("beforeunload", flushSave);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [flushSave]);
 
   // ── 5. syncPatch ───────────────────────────────────────────────────────────
   const syncPatch = useCallback((data: PhaseData) => {

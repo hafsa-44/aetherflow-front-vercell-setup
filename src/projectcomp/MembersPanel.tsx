@@ -129,8 +129,8 @@ export default function MembersPanel({ projectId, isOpen, onClose, canInvite, cu
   useEffect(() => {
     if (!isOpen || !projectId || !currentUser) return;
 
-    const SERVER_URL = (import.meta as any).env?.VITE_SERVER_URL ?? "http://localhost:5000";
-
+ 
+  const SERVER_URL = (import.meta as any).env?.VITE_API_URL ?? "http://localhost:5000";
     let socket: Socket;
     let cancelled = false;
 

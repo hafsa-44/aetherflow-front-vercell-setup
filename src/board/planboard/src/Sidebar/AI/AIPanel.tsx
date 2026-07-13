@@ -14,7 +14,8 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getAccessToken } from "../../../../../api";
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || "/api";
+//const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || "/api";
+const BASE_URL = (import.meta.env.VITE_API_URL as string) || "/api";
 
 // ── Config ─────────────────────────────────────────────────────────────────
 // No provider key here — the key lives on the server.

@@ -9,7 +9,8 @@ import { useParams } from "react-router-dom";
 
 //import api, { getAccessToken } from "../../../../../api";
 
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || "/api";
+//const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || "/api";
+const BASE_URL = (import.meta.env.VITE_API_URL as string) || "/api";
 import api, { getAccessToken } from "../../../../../api";
 // ── Public types (imported by canvas.tsx) ────────────────────────────────────
 

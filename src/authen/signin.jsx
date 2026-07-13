@@ -204,7 +204,8 @@ catch (err) {
   //window.location.href = 'http://localhost:5000/api/auth/google';
    const redirect = searchParams.get("redirect");
    const redirectParam = redirect ? `?redirect=${encodeURIComponent(redirect)}` : "";
-    window.location.href = `http://localhost:5000/api/auth/google${redirectParam}`;
+   window.location.href = `${import.meta.env.VITE_API_URL ?? "http://localhost:5000"}/api/auth/google${redirectParam}`;
+   // window.location.href = `http://localhost:5000/api/auth/google${redirectParam}`;
   }}
           className="w-full bg-black mt-2 flex items-center justify-center gap-3 border border-gray-300 py-2 rounded-md hover:bg-gray-500"
         >

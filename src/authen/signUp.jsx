@@ -562,7 +562,8 @@ if (result?.success) {
           type="button"
           onClick={() => {
             // ✅ Correct - should point to the START of Google OAuth flow
-           window.location.href = 'http://localhost:5000/api/auth/google';
+          // window.location.href = 'http://localhost:5000/api/auth/google';
+           window.location.href = `${import.meta.env.VITE_API_URL ?? "http://localhost:5000"}/api/auth/google`;
     //window.location.href = window.location.href = 'http://localhost:5000/api/auth/google/callback?code=...';
  
   }}

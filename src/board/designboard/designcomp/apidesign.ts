@@ -81,7 +81,8 @@ import axios from 'axios';
 import { getAccessToken } from '../../../api'; // same token source the rest of the app uses
 
 // Use environment variable or fallback to localhost
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+// API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const api = axios.create({
      baseURL: API_BASE_URL,

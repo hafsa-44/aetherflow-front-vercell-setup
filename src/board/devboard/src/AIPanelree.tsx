@@ -22,8 +22,9 @@ import { getAccessToken } from '../../../api';
 
 // ── Config ─────────────────────────────────────────────────────────────────
 // Matches the local BASE_URL convention already used in chatModule.tsx.
-const BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? '/api';
+//const BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? '/api';
 
+const BASE_URL = (import.meta.env.VITE_API_URL as string) || "/api";
 const DEFAULT_WIDTH = 280;   // px — initial panel width
 const MIN_WIDTH = 240;   // px
 // Max width (40% of window) is computed at runtime

@@ -1,14 +1,33 @@
 
-//this to use 
+/**
+ * AIPanel.tsx  — AetherFlow Developments Board
+ * ─────────────────────────────────────────────
+ * Improvements over v1:
+ *  • Resizable panel: default 280px, drag to up to 40% of screen width
+ *  • Markdown rendering: headings, bold, italic, inline code, code blocks, lists
+ *  • Per-message actions: Copy · Edit · Delete (appear on hover)
+ *  • Auto-growing textarea input
+ *  • Proper code block syntax highlighting style
+ *
+ * Talks to the real backend now — POST /api/ai/devboard/:projectId (Groq,
+ * server-side key) instead of calling OpenRouter directly from the browser.
+ * History is persisted server-side via /api/ai/history/:projectId, the same
+ * endpoint the Planning phase panel (chatModule.tsx) already uses.
+ */
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+// Same shared axios instance + in-memory access token used by the
+// Planning/Design phases. NOTE: adjust this relative path if your project
+// structure differs — it's derived from board.tsx's own "../../../api" import.
+import { getAccessToken } from '../../../api';
 
 // ── Config ─────────────────────────────────────────────────────────────────
-const OPENROUTER_KEY   = (import.meta as any).env?.VITE_OPENROUTER_KEY ?? '';
-const OPENROUTER_MODEL = 'anthropic/claude-sonnet-4-5';
-const OPENROUTER_URL   = 'https://openrouter.ai/api/v1/chat/completions';
+// Matches the local BASE_URL convention already used in chatModule.tsx.
+//const BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? '/api';
+const BASE_URL = (import.meta.env.VITE_API_URL as string) || "/api";
 
 const DEFAULT_WIDTH = 280;   // px — initial panel width
-const MIN_WIDTH     = 240;   // px
+const MIN_WIDTH = 240;   // px
 // Max width (40% of window) is computed at runtime
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -17,6 +36,62 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   ts: number;
+}
+
+// Shape returned by GET /aiContext/:projectId (same endpoint the Planning
+// and Design phases already use). All fields are optional/best-effort.
+interface AiContext {
+  projectName?: string;
+  description?: string;
+  projectType?: string;
+  nature?: string;
+  color?: string;
+  techStack?: string | string[];
+  targetUser?: string;
+  purpose?: string;
+  explanationDepth?: 'beginner' | 'intermediate' | 'expert';
+  learningOrientation?: string;
+  knownConstraints?: string;
+  keyFeatures?: string | string[];
+  outOfScope?: string;
+  boardSummary?: string;
+}
+
+function joinField(v?: string | string[]): string {
+  if (!v) return '';
+  return Array.isArray(v) ? v.join(', ') : v;
+}
+
+// The scoped object actually sent to the backend as `projectContext` on
+// every /devboard call. Dev phase only needs: tech stack, summary, known
+// constraints, key features, and learning orientation — NOT color/purpose/
+// targetUser, which are Design-phase concerns.
+function buildDevContext(ctx: AiContext | null) {
+  if (!ctx) return null;
+  return {
+    techStack: ctx.techStack,
+    boardSummary: ctx.boardSummary,
+    knownConstraints: ctx.knownConstraints,
+    keyFeatures: ctx.keyFeatures,
+    learningOrientation: ctx.learningOrientation,
+  };
+}
+
+// Short, human-readable summary shown as the panel's own first message,
+// so the user can see exactly what context the AI currently has.
+function buildContextSummaryMessage(ctx: AiContext | null): string {
+  if (!ctx) {
+    return "Ask anything about your code, architecture, or next steps.\n\n_(No project context found yet — fill in the AI Context form in the Planning phase for more relevant answers.)_";
+  }
+  const parts: string[] = [];
+  parts.push(`Here's what I know about **${ctx.projectName || 'this project'}**:`);
+  if (joinField(ctx.techStack)) parts.push(`- **Tech stack:** ${joinField(ctx.techStack)}`);
+  if (ctx.boardSummary) parts.push(`- **Summary:** ${ctx.boardSummary}`);
+  if (joinField(ctx.keyFeatures)) parts.push(`- **Key features:** ${joinField(ctx.keyFeatures)}`);
+  if (ctx.knownConstraints) parts.push(`- **Constraints:** ${ctx.knownConstraints}`);
+  if (ctx.learningOrientation) parts.push(`- **Learning orientation:** ${ctx.learningOrientation}`);
+  parts.push('\nAsk anything about your code, architecture, or next steps.');
+  return parts.join('\n');
 }
 
 // ── Suggestions ────────────────────────────────────────────────────────────
@@ -160,48 +235,56 @@ function inlineMarkdown(text: string): React.ReactNode {
 }
 
 // ── API call ───────────────────────────────────────────────────────────────
-async function callOpenRouter(
+// Calls POST /api/ai/devboard/:projectId — the server holds the Groq key,
+// verifies project membership, applies the devboard-aware system prompt
+// (built server-side from `projectContext`), and returns a single JSON reply.
+async function callDevboard(
+  projectId: string | undefined,
   messages: { role: string; content: string }[],
+  projectContext: ReturnType<typeof buildDevContext>,
   signal?: AbortSignal,
 ): Promise<string> {
-  if (!OPENROUTER_KEY) {
-    throw new Error('Missing VITE_OPENROUTER_KEY in .env — add it and restart Vite.');
-  }
+  if (!projectId) throw new Error('No project selected.');
+  const token = getAccessToken();
 
-  const res = await fetch(OPENROUTER_URL, {
+  const res = await fetch(`${BASE_URL}/ai/devboard/${projectId}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${OPENROUTER_KEY}`,
-      'HTTP-Referer': 'http://localhost:5173',
-      'X-Title': 'AetherFlow Dev Board',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({
-      model: OPENROUTER_MODEL,
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are an expert AI assistant embedded in AetherFlow — a collaborative developer IDE and task board. ' +
-            'Help with code questions, architecture, debugging, naming, and feature decisions. ' +
-            'Be concise and practical. Format your responses with proper Markdown: ' +
-            'use ## for section headings, **bold** for emphasis, `inline code` for identifiers, ' +
-            'and fenced ```language blocks for code samples. Use bullet lists for enumerations.',
-        },
-        ...messages,
-      ],
-    }),
+    credentials: 'include',
+    body: JSON.stringify({ messages, projectContext }),
     signal,
   });
 
   if (!res.ok) {
     const body = await res.text().catch(() => res.statusText);
-    throw new Error(`OpenRouter ${res.status}: ${body}`);
+    throw new Error(`AI request failed (${res.status}): ${body}`);
   }
 
   const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? '(empty response)';
+  if (!data?.success) throw new Error(data?.error || 'AI request failed.');
+  return data.content ?? '(empty response)';
+}
+
+// Fire-and-forget — persists a single message to the server so it survives
+// reloads. Mirrors the exact pattern chatModule.tsx uses for the Planning
+// phase. Failures are intentionally silent: the UI already shows the
+// message, so a save error shouldn't interrupt the user.
+function persistDevMessage(projectId: string | undefined, role: 'user' | 'assistant', content: string) {
+  if (!projectId) return;
+  const token = getAccessToken();
+  if (!token) return;
+  fetch(`${BASE_URL}/ai/history/${projectId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: 'include',
+    body: JSON.stringify({ role, content }),
+  }).catch(() => { /* non-fatal */ });
 }
 
 // ── Message bubble with actions ────────────────────────────────────────────
@@ -212,10 +295,10 @@ interface BubbleProps {
 }
 
 const MessageBubble: React.FC<BubbleProps> = ({ msg, onDelete, onEdit }) => {
-  const [hovered,  setHovered]  = useState(false);
-  const [editing,  setEditing]  = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(msg.content);
-  const [copied,   setCopied]   = useState(false);
+  const [copied, setCopied] = useState(false);
   const editRef = useRef<HTMLTextAreaElement>(null);
 
   const isUser = msg.role === 'user';
@@ -292,19 +375,79 @@ const MessageBubble: React.FC<BubbleProps> = ({ msg, onDelete, onEdit }) => {
 };
 
 // ── Main component ─────────────────────────────────────────────────────────
-const AIPanel: React.FC = () => {
-  const [messages,   setMessages]   = useState<Message[]>([]);
-  const [input,      setInput]      = useState('');
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState<string | null>(null);
-  const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
+interface AIPanelProps {
+  projectId?: string;
+}
 
-  const bottomRef   = useRef<HTMLDivElement>(null);
+const AIPanel: React.FC<AIPanelProps> = ({ projectId }) => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
+  const [aiContext, setAiContext] = useState<AiContext | null>(null);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+
+  const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const abortRef    = useRef<AbortController | null>(null);
-  const isDragging  = useRef(false);
-  const dragStartX  = useRef(0);
-  const dragStartW  = useRef(DEFAULT_WIDTH);
+  const abortRef = useRef<AbortController | null>(null);
+  const isDragging = useRef(false);
+  const dragStartX = useRef(0);
+  const dragStartW = useRef(DEFAULT_WIDTH);
+  const historyLoadedProjectRef = useRef<string | undefined>(undefined);
+
+  // Load real, server-persisted history for this project.
+  // Mirrors chatModule.tsx's GET /ai/history/:projectId?limit=60 exactly.
+  useEffect(() => {
+    if (!projectId || historyLoadedProjectRef.current === projectId) return;
+    historyLoadedProjectRef.current = projectId;
+    setHistoryLoaded(false);
+    const token = getAccessToken();
+    if (!token) { setHistoryLoaded(true); return; }
+    fetch(`${BASE_URL}/ai/history/${projectId}?limit=60`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    })
+      .then(res => (res.ok ? res.json() : []))
+      .then((data: any[]) => {
+        if (Array.isArray(data) && data.length) {
+          setMessages(data.map((m, idx) => ({
+            id: m._id || `h-${idx}-${m.ts || Date.now()}`,
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: String(m.content ?? ''),
+            ts: m.ts ? new Date(m.ts).getTime() : Date.now(),
+          })));
+        }
+      })
+      .catch(() => { /* keep whatever's already in state — non-fatal */ })
+      .finally(() => setHistoryLoaded(true));
+  }, [projectId]);
+
+  // Fetch the project's AI-context form (name, description, tech stack…)
+  // so answers in this phase are grounded in the actual project, not generic.
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    const load = () => {
+      const token = getAccessToken();
+      fetch(`${BASE_URL}/aiContext/${projectId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        credentials: 'include',
+      })
+        .then(res => (res.ok ? res.json() : null))
+        .then(data => { if (!cancelled && data) setAiContext(data); })
+        .catch(() => { /* context is optional — fail silently */ });
+    };
+    load();
+    // Refetch immediately if the AI Context form is saved elsewhere in the
+    // app (Planning phase sidebar), without requiring a page reload.
+    const onUpdated = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || detail.projectId === projectId) load();
+    };
+    window.addEventListener('aiContext:updated', onUpdated);
+    return () => { cancelled = true; window.removeEventListener('aiContext:updated', onUpdated); };
+  }, [projectId]);
 
   // Auto-scroll
   useEffect(() => {
@@ -322,14 +465,14 @@ const AIPanel: React.FC = () => {
   // ── Drag-to-resize ──────────────────────────────────────────────────────
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
-    isDragging.current  = true;
-    dragStartX.current  = e.clientX;
-    dragStartW.current  = panelWidth;
+    isDragging.current = true;
+    dragStartX.current = e.clientX;
+    dragStartW.current = panelWidth;
 
     const onMove = (ev: MouseEvent) => {
       if (!isDragging.current) return;
       const maxWidth = window.innerWidth * 0.40;
-      const delta    = dragStartX.current - ev.clientX; // dragging left = wider
+      const delta = dragStartX.current - ev.clientX; // dragging left = wider
       const newWidth = Math.max(MIN_WIDTH, Math.min(maxWidth, dragStartW.current + delta));
       setPanelWidth(newWidth);
     };
@@ -354,34 +497,36 @@ const AIPanel: React.FC = () => {
     abortRef.current = ctrl;
 
     const userMsg: Message = {
-      id:      `u-${Date.now()}`,
-      role:    'user',
+      id: `u-${Date.now()}`,
+      role: 'user',
       content: trimmed,
-      ts:      Date.now(),
+      ts: Date.now(),
     };
 
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setLoading(true);
     setError(null);
+    persistDevMessage(projectId, 'user', trimmed);
 
     try {
       const history = [...messages, userMsg]
         .slice(-10)
         .map(m => ({ role: m.role, content: m.content }));
 
-      const reply = await callOpenRouter(history, ctrl.signal);
+      const reply = await callDevboard(projectId, history, buildDevContext(aiContext), ctrl.signal);
       setMessages(prev => [
         ...prev,
         { id: `a-${Date.now()}`, role: 'assistant', content: reply, ts: Date.now() },
       ]);
+      persistDevMessage(projectId, 'assistant', reply);
     } catch (e: any) {
       if (e?.name !== 'AbortError') setError(e?.message ?? 'Unknown error');
     } finally {
       setLoading(false);
       setTimeout(() => textareaRef.current?.focus(), 50);
     }
-  }, [loading, messages]);
+  }, [loading, messages, aiContext, projectId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); }
@@ -395,6 +540,9 @@ const AIPanel: React.FC = () => {
     setMessages(prev => prev.map(m => m.id === id ? { ...m, content: newContent } : m));
   };
 
+  // Clears the panel's local view only — mirrors chatModule.tsx's behavior.
+  // Server-side history isn't deleted, so reopening the panel still shows
+  // the real conversation (consistent with how Planning phase works today).
   const clearChat = () => {
     abortRef.current?.abort();
     setMessages([]);
@@ -636,9 +784,9 @@ const AIPanel: React.FC = () => {
 
         {/* Messages */}
         <div className="ai-logs">
-          {messages.length === 0 && !loading && (
-            <div className="ai-empty">
-              Ask anything about your code,<br />architecture, or next steps.
+          {messages.length === 0 && !loading && historyLoaded && (
+            <div className="ai-empty" style={{ textAlign: 'left', whiteSpace: 'pre-wrap' }}>
+              {renderMarkdown(buildContextSummaryMessage(aiContext))}
             </div>
           )}
 
@@ -672,7 +820,7 @@ const AIPanel: React.FC = () => {
         </div>
 
         {/* Suggestions on empty state */}
-        {messages.length === 0 && !loading && (
+        {messages.length === 0 && !loading && historyLoaded && (
           <div className="ai-suggestions">
             {SUGGESTIONS.map(s => (
               <button
